@@ -1,3 +1,4 @@
+import matplotlib
 import matplotlib.pyplot as plt
 
 
@@ -10,6 +11,7 @@ def init_fig():
     plt.rc('axes', linewidth=2)
     plt.rc('xtick.major', size=10, width=1.5)
     plt.rc('ytick.major', size=10, width=1.5)
+    plt.ion()
 
 
 def simpleaxis(ax):
@@ -24,3 +26,29 @@ def noclip(e):
         b.set_clip_on(False)
     for b in e[2]:
         b.set_clip_on(False)
+
+
+def showpause(t=2):
+    plt.show()
+    plt.pause(t)
+
+
+# define colormaps
+cdict = {'red': ((0.0, 0.0, 0.0),
+                 (1.0, 0.0, 0.0)),
+         'green': ((0.0, 0.0, 0.0),
+                   (1.0, 1.0, 1.0)),
+         'blue': ((0.0, 0.0, 0.0),
+                  (1.0, 0.0, 0.0))}
+gfp = matplotlib.colors.LinearSegmentedColormap('GFP_colormap', cdict, 256)
+
+cdict2 = {'red': ((0.0, 0.0, 0.0),
+                  (0.5, 0.0, 0.0),
+                  (1.0, 0.0, 0.0)),
+          'green': ((0.0, 0.0, 0.0),
+                    (0.5, 0.0, 0.0),
+                    (1.0, 1.0, 1.0)),
+          'blue': ((0.0, 1.0, 1.0),
+                   (0.5, 0.0, 0.0),
+                   (1.0, 0.0, 0.0))}
+blue2green = matplotlib.colors.LinearSegmentedColormap('Blue2Green_colormap', cdict2, 256)

@@ -1,26 +1,22 @@
 import numpy as np
-import ca_source_extraction as cse
 import matplotlib
 import matplotlib.pyplot as plt
 import tifffile
 from operator import itemgetter
 from skimage.filters import gaussian
-from functions import init_fig
+from functions import init_fig, gfp
+import ca_source_extraction as cse
 
+try:
+    from sys import argv
+    from os.path import isdir
+    figpath = argv[1] if isdir(argv[1]) else False
+except:
+    figpath = False
 
 init_fig()
 plt.rc('font', size=20, **{'family': 'sans-serif',
                            'sans-serif': ['Computer Modern']})
-save_figs = False  # subfolder fig must exist if set to True
-
-
-cdict = {'red': ((0.0, 0.0, 0.0),
-                 (1.0, 0.0, 0.0)),
-         'green': ((0.0, 0.0, 0.0),
-                   (1.0, 1.0, 1.0)),
-         'blue': ((0.0, 0.0, 0.0),
-                  (1.0, 0.0, 0.0))}
-gfp = matplotlib.colors.LinearSegmentedColormap('GFP_colormap', cdict, 256)
 
 #
 
@@ -103,6 +99,5 @@ plt.yticks(range(0, 4000, 1000), range(1000, 5000, 1000), fontsize=18)
 cb.ax.yaxis.label.set_font_properties(
     matplotlib.font_manager.FontProperties(size=18))
 
-if save_figs:
-    plt.savefig('fig/data+reconstruction.pdf', bbox_inches='tight', pad_inches=.01)
-plt.show()
+plt.savefig(figpath + '/data+reconstruction.pdf', bbox_inches='tight', pad_inches=.01)\
+    if figpath else plt.show(block=True)

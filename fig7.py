@@ -5,26 +5,24 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 import tifffile
 from skimage.filters import gaussian
 from scipy.ndimage.measurements import center_of_mass
-from functions import init_fig, simpleaxis, noclip
+from functions import init_fig, simpleaxis, noclip, gfp, showpause
 import ca_source_extraction as cse
 
+try:
+    from sys import argv
+    from os.path import isdir
+    figpath = argv[1] if isdir(argv[1]) else False
+except:
+    figpath = False
 
 init_fig()
-save_figs = False  # subfolder fig must exist if set to True
+
 plt.rc('font', size=20, **{'family': 'sans-serif', 'sans-serif': ['Computer Modern']})
 
 
 # colors for colorblind from http://www.cookbook-r.com/Graphs/Colors_(ggplot2)
 col = ["#D55E00", "#E69F00", "#F0E442", "#009E73", "#56B4E9", "#0072B2", "#CC79A7", "#999999"]
 [vermillon, orange, yellow, green, cyan, blue, purple, grey] = col
-# define colormap
-cdict = {'red': ((0.0, 0.0, 0.0),
-                 (1.0, 0.0, 0.0)),
-         'green': ((0.0, 0.0, 0.0),
-                   (1.0, 1.0, 1.0)),
-         'blue': ((0.0, 0.0, 0.0),
-                  (1.0, 0.0, 0.0))}
-gfp = matplotlib.colors.LinearSegmentedColormap('GFP_colormap', cdict, 256)
 
 #
 
@@ -81,8 +79,9 @@ cb.set_ticks(range(1000, 4000, 1000))
 plt.yticks(range(1000, 4000, 1000), range(1000, 4000, 1000), fontsize=16)
 cb.ax.yaxis.label.set_font_properties(matplotlib.font_manager.FontProperties(size=16))
 plt.subplots_adjust(.005, 0, .89, 1)
-if save_figs:
-    plt.savefig('fig/data-1stHalf.pdf', bbox_inches='tight', pad_inches=.01)
+plt.savefig(figpath + '/data-1stHalf.pdf', bbox_inches='tight',
+            pad_inches=.01) if figpath else showpause()
+
 
 #
 
@@ -109,7 +108,7 @@ print len(np.argmin(dist, 1)) - len(set(np.argmin(dist, 1)))
 # indices of those targets
 idx2 = np.sort(idx)[np.where(np.sort(idx)[1:] - np.sort(idx)[:-1] == 0)]
 # distances to target neurons
-print [np.min(dist, 1)[np.argmin(dist, 1) == i] for i in idx2]
+print[np.min(dist, 1)[np.argmin(dist, 1) == i] for i in idx2]
 # the ones far away have been removed on decimated data, hence set idx to None
 idxH = np.asarray([None if np.min(dist, 1)[k] > 7 else idx[k] for k in range(len(idx))])
 
@@ -127,7 +126,7 @@ print len(np.argmin(dist, 1)) - len(set(np.argmin(dist, 1)))
 # indices of those targets
 idx2 = np.sort(idx)[np.where(np.sort(idx)[1:] - np.sort(idx)[:-1] == 0)]
 # distances to target neurons
-print [np.min(dist, 1)[np.argmin(dist, 1) == i] for i in idx2]
+print[np.min(dist, 1)[np.argmin(dist, 1) == i] for i in idx2]
 # the ones far away have been removed on decimated data, hence set idx to None
 idxQ = np.asarray([None if np.min(dist, 1)[k] > 7 else idx[k] for k in range(len(idx))])
 
@@ -186,16 +185,14 @@ l1, = plt.plot([0, 1], [-1, -1], lw=4, c='k', label='denoised')
 l2, = plt.plot([0, 1], [-1, -1], lw=4, c='k', ls='--', label='deconvolved')
 ax = plt.gca().add_artist(first_legend)  # Add the legend manually to the current Axes.
 plt.legend(handles=[l1, l2], loc=(.55, .78))  # Create another legend for the second line.
-if save_figs:
-    plt.savefig('fig/Corr-AonSmallBatch.pdf')
-plt.show()
+plt.savefig(figpath + '/Corr-AonSmallBatch.pdf') if figpath else showpause()
 
 
 # ## shuffled data
 
-ssub = np.load('results/decimate-shuffled.npz')['ssub'].item()
-ssubH = np.load('results/decimate-shuffled-Aon1stHalf.npz')['ssub'].item()
-ssubQ = np.load('results/decimate-shuffled-Aon1stQuarter.npz')['ssub'].item()
+ssub = np.load('results/decimate-stratshuffled.npz')['ssub'].item()
+ssubH = np.load('results/decimate-stratshuffled-Aon1stHalf.npz')['ssub'].item()
+ssubQ = np.load('results/decimate-stratshuffled-Aon1stQuarter.npz')['ssub'].item()
 
 rng = slice(T / 2, T)
 plt.figure()
@@ -203,6 +200,4 @@ first_legend = plotCorr([ssub, ssubH, ssubQ], trueC, rng, ca_or_spikes='ca')
 plotCorr([ssub, ssubH, ssubQ], trueSpikes, rng, ca_or_spikes='spikes', ls='--')
 plt.ylabel(r'Correlation w/ ground truth $C$\textsuperscript{s}/$S$\textsuperscript{s}',
            y=.42, labelpad=3)
-if save_figs:
-    plt.savefig('fig/Corr-shuffled-AonSmallBatch.pdf')
-plt.show()
+plt.savefig(figpath + '/Corr-stratshuffled-AonSmallBatch.pdf') if figpath else plt.show(block=True)

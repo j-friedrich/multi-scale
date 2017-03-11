@@ -1,5 +1,4 @@
 # writes every frame to a file and uses ffmpeg to asseble the video
-import matplotlib
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import numpy as np
@@ -8,29 +7,11 @@ import tifffile
 from os import system
 from skimage.filters import gaussian
 from scipy.sparse import coo_matrix
+from functions import gfp, blue2green
 
 filename = '180um_20fps_350umX350um.tif'
 data = tifffile.TiffFile(filename).asarray()
 T, X, Y = data.shape
-
-# define colormaps
-cdict = {'red': ((0.0, 0.0, 0.0),
-                 (1.0, 0.0, 0.0)),
-         'green': ((0.0, 0.0, 0.0),
-                   (1.0, 1.0, 1.0)),
-         'blue': ((0.0, 0.0, 0.0),
-                  (1.0, 0.0, 0.0))}
-gfp = matplotlib.colors.LinearSegmentedColormap('GFP_colormap', cdict, 256)
-cdict = {'red': ((0.0, 0.0, 0.0),
-                 (0.5, 0.0, 0.0),
-                 (1.0, 0.0, 0.0)),
-         'green': ((0.0, 0.0, 0.0),
-                   (0.5, 0.0, 0.0),
-                   (1.0, 1.0, 1.0)),
-         'blue': ((0.0, 1.0, 1.0),
-                  (0.5, 0.0, 0.0),
-                  (1.0, 0.0, 0.0))}
-blue2green = matplotlib.colors.LinearSegmentedColormap('Blue2Green_colormap', cdict, 256)
 
 
 ds = 16

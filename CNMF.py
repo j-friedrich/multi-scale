@@ -1,20 +1,23 @@
+import numpy as np
 from numpy import min, max, asarray, percentile, zeros, exp, ones, dot, where,\
-    r_, ix_, arange, nan_to_num, prod, repeat, argsort, outer
+    r_, ix_, arange, nan_to_num, prod, repeat, argsort, outer, clip
 from time import time
+from scipy.linalg import eigh
 
 
-def HALS4activity(data, S, activity, iters=1):
+def HALS4activity(data, S, activity, iters=1, nonneg=True):
     A = S.dot(data.T)
     B = S.dot(S.T)
     for _ in range(iters):
         for ll in range(len(S)):
             activity[ll] += nan_to_num((A[ll] - dot(B[ll].T, activity)) / B[ll, ll])
-            activity[ll][activity[ll] < 0] = 0
+            if nonneg:
+                activity[ll][activity[ll] < 0] = 0
     return activity
 
 
-def LocalNMF(data, centers, sig, NonNegative=True, iters=10, verbose=False,
-             adaptBias=True, iters0=30, mb=30, ds=None):
+def LocalNMF(data, centers, sig, iters=10, verbose=False, adaptBias=True,
+             iters0=30, mb=30, ds=None, method=None, M=100, nonneg=True):
     """
     Parameters
     ----------
@@ -25,8 +28,6 @@ def LocalNMF(data, centers, sig, NonNegative=True, iters=10, verbose=False,
         if int : initial number of randomly placed tiles, ~3-10 times number of neurons
     sig : array, shape (D,)
         size of the gaussian kernel in different spatial directions
-    NonNegative : boolean
-        if True, neurons should be considered as non-negative
     iters : int
         number of final iterations on whole data
     verbose : boolean
@@ -39,6 +40,13 @@ def LocalNMF(data, centers, sig, NonNegative=True, iters=10, verbose=False,
         minibatchsize for temporal decimation
     ds : array, shape (D,)
         factor for spatial decimation in different spatial directions
+    method : 'random', 'svd', 'subsample' or None
+        compression method
+    M : int
+        compressed size
+    nonneg: boolean
+        if True, enforce nonnegative also on compressed data
+
 
 
     Returns
@@ -63,7 +71,6 @@ def LocalNMF(data, centers, sig, NonNegative=True, iters=10, verbose=False,
     mask = []  # binary matrix, indicates where shapes has non-zero entries
     boxes = zeros((L, D - 1, 2), dtype=int)
     MSE_array = []
-    activity = zeros((L, dims[0] / mb))
     if iters0 == 0 or ds is None:
         ds = ones(D - 1, dtype='uint8')
     else:
@@ -84,25 +91,27 @@ def LocalNMF(data, centers, sig, NonNegative=True, iters=10, verbose=False,
         for _ in range(iters):
             for ll in range(L + adaptBias):
                 if ll == L:
-                    S[ll] += nan_to_num((C[ll] - dot(D[ll], S)) / D[ll, ll])
+                    S[ll] = clip(S[ll] +
+                                 nan_to_num((C[ll] - dot(D[ll], S)) / D[ll, ll]), 0, np.inf)
                 else:
-                    S[ll, mask[ll]] += nan_to_num((C[ll, mask[ll]]
-                                                   - dot(D[ll], S[:, mask[ll]])) / D[ll, ll])
-                S[ll][S[ll] < 0] = 0
+                    S[ll, mask[ll]] = clip(S[ll, mask[ll]] +
+                                           nan_to_num((C[ll, mask[ll]] -
+                                                       dot(D[ll], S[:, mask[ll]])) / D[ll, ll]),
+                                           0, np.inf)
         return S
 
     mse = lambda res: res.ravel().dot(res.ravel()) / res.size
 
 ### Initialize shapes (with boxes and mask), activity, and background ###
-    if mb > 1:
+    if mb > 1:  # decimation
         # temporal downsampling
-        data0 = data[:len(data) / mb * mb].reshape((-1, mb) +
-                                                   data.shape[1:]).mean(1).astype('float32')
+        data0 = data[:len(data) / mb * mb].reshape((-1, mb) + data.shape[1:])\
+            .mean(1).astype('float32')
         # spatial downsampling
         if D == 4:
             data0 = data0.reshape(
-                len(data0), dims[1] / ds[0], ds[0], dims[2] / ds[1], ds[1], dims[3] / ds[2], ds[2])\
-                .mean(2).mean(3).mean(4)
+                len(data0), dims[1] / ds[0], ds[0], dims[2] / ds[1], ds[1],
+                dims[3] / ds[2], ds[2]).mean(2).mean(3).mean(4)
             activity = data0[:, map(int, centers[:, 0] / ds[0]), map(int, centers[:, 1] / ds[1]),
                              map(int, centers[:, 2] / ds[2])].T
         else:
@@ -112,9 +121,46 @@ def LocalNMF(data, centers, sig, NonNegative=True, iters=10, verbose=False,
         dims0 = data0.shape
         # reshape tensor to matrix
         data0 = data0.reshape(dims0[0], -1)
-    if iters0 == 0:
-        activity = data[:, centers[:, 0].astype(int), centers[:, 1].astype(int)].T
+    elif iters0:  # some other compression
+        data0 = data.reshape(dims[0], -1).astype('float32')
         dims0 = dims
+    else:  # no compression
+        if D == 4:
+            activity = data[:, centers[:, 0], centers[:, 1], centers[:, 2]].T.astype('float32')
+        else:
+            activity = data[:, centers[:, 0], centers[:, 1]].T.astype('float32')
+        dims0 = dims
+
+    if method == 'subsample':
+        data0 = data0[np.linspace(0, dims0[0] - 1, M).astype(int)]
+        dims0 = (M,) + dims0[1:]
+
+    elif method == 'random':
+        np.random.seed(1)
+        # Mariano Tepper, Guillermo Sapiro: COMPRESSED NONNEGATIVE MATRIX
+        # FACTORIZATION IS FAST AND ACCURATE
+        Om = np.random.randn(np.prod(dims0[1:]), M).astype('float32')
+        # B = data0.dot(data0.T.dot(data0.dot(Om)))
+        B = data0.dot(Om)
+        Lmatrix = np.linalg.qr(B)[0]
+        Om = np.random.randn(dims0[0], M).astype('float32')
+        # B = data0.T.dot(data0.dot(data0.T.dot(Om)))
+        B = data0.T.dot(Om)
+        Rmatrix = np.linalg.qr(B)[0].T
+        dataL = Lmatrix.T.dot(data0)
+        dataR = data0.dot(Rmatrix.T)
+
+    elif method == 'svd':
+        if mb > 1:
+            data_dec = data0.copy()
+        COV = data0.dot(data0.T)
+        _, V = eigh(COV, eigvals=(len(COV) - M, len(COV) - 1))
+        data0 = V.T.dot(data0)
+        dims0 = (M,) + dims0[1:]
+
+    if method is not None:
+        activity = data0.reshape(dims0)[:, centers[:, 0], centers[:, 1]].T
+
     data = data.astype('float32').reshape(dims[0], -1)
     # initialize shapes as Gaussians
     S = zeros((L + adaptBias, prod(dims0[1:])), dtype='float32')
@@ -123,21 +169,29 @@ def LocalNMF(data, centers, sig, NonNegative=True, iters=10, verbose=False,
         temp = zeros(dims0[1:])
         temp[map(lambda a: slice(*a), boxes[ll])]=1
         mask += where(temp.ravel())
-        temp = [(arange(dims[i + 1] / ds[i]) - centers[ll][i] / float(ds[i])) ** 2
-                / (2 * (sig[i] / float(ds[i])) ** 2)
+        temp = [(arange(dims[i + 1] / ds[i]) - centers[ll][i] / float(ds[i])) ** 2 /
+                (2 * (sig[i] / float(ds[i])) ** 2)
                 for i in range(D - 1)]
         temp = exp(-sum(ix_(*temp)))
         S[ll, mask[ll]] = temp.ravel()[mask[ll]]
     if adaptBias:
         # Initialize background as 20% percentile
-        S[-1] = percentile(data0, 20, 0) if mb > 1 else percentile(data, 20, 0)
-        activity = r_[activity, ones((1, dims0[0]), dtype='float32')]
+        if method == 'svd':
+            activity = r_[activity, V.sum(0).reshape(1, -1)]
+            S[-1] = percentile(data_dec, 20, 0) if mb > 1 else percentile(data, 20, 0)
+        else:
+            activity = r_[activity, ones((1, dims0[0]), dtype='float32')]
+            S[-1] = percentile(data0, 20, 0) if mb > 0 else percentile(data, 20, 0)
 
 ### Get shape estimates on subset of data ###
     if iters0:
         for kk in range(iters0):
-            S = HALS4shape(data0, S, activity)
-            activity = HALS4activity(data0, S, activity)
+            if method == 'random':
+                S = HALS4shape(dataL, S, activity.dot(Lmatrix))
+                activity = HALS4activity(dataR, S.dot(Rmatrix.T), activity, nonneg=nonneg)
+            else:
+                S = HALS4shape(data0, S, activity)
+                activity = HALS4activity(data0, S, activity, nonneg=nonneg)
 
     ### Back to full data ##
         activity = ones((L + adaptBias, dims[0]),

@@ -1,5 +1,4 @@
 # writes every frame to a file and uses ffmpeg to asseble the video
-import matplotlib
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import numpy as np
@@ -8,26 +7,8 @@ from skimage.filters import gaussian
 from scipy.sparse import coo_matrix
 from CNMF import LocalNMF, HALS4activity
 import ca_source_extraction as cse  # github.com/j-friedrich/Constrained_NMF/tree/multi-scale_paper
+from functions import gfp, blue2green
 
-
-# define colormaps
-cdict = {'red': ((0.0, 0.0, 0.0),
-                 (1.0, 0.0, 0.0)),
-         'green': ((0.0, 0.0, 0.0),
-                   (1.0, 1.0, 1.0)),
-         'blue': ((0.0, 0.0, 0.0),
-                  (1.0, 0.0, 0.0))}
-gfp = matplotlib.colors.LinearSegmentedColormap('GFP_colormap', cdict, 256)
-cdict = {'red': ((0.0, 0.0, 0.0),
-                 (0.5, 0.0, 0.0),
-                 (1.0, 0.0, 0.0)),
-         'green': ((0.0, 0.0, 0.0),
-                   (0.5, 0.0, 0.0),
-                   (1.0, 1.0, 1.0)),
-         'blue': ((0.0, 1.0, 1.0),
-                  (0.5, 0.0, 0.0),
-                  (1.0, 0.0, 0.0))}
-blue2green = matplotlib.colors.LinearSegmentedColormap('Blue2Green_colormap', cdict, 256)
 
 data = np.load('data_zebrafish.npy')
 T, X, Y = data.shape
@@ -36,9 +17,8 @@ ds = 8
 plot_smooth_shapes = True
 
 # find neurons greedily
-N = 43
-centers = cse.greedyROI(data.reshape((-1, 30) + data.shape[1:]).mean(1)
-                        .transpose(1, 2, 0), nr=N, gSig=[4, 4])[2]
+N = 49
+centers = cse.initialization.initialize_components(data.transpose(1, 2, 0), N)[-1]
 
 MSE_array, shapes, activity, boxes = LocalNMF(data, centers, sig, iters=40, mb=20, iters0=30)
 # scale

@@ -3,13 +3,18 @@ import matplotlib.pyplot as plt
 from skimage.transform import downscale_local_mean
 from skimage.filters import gaussian
 from scipy.ndimage.measurements import center_of_mass
+from scipy.optimize import minimize_scalar
 from functions import init_fig, simpleaxis
 import ca_source_extraction as cse
 
+try:
+    from sys import argv
+    from os.path import isdir
+    figpath = argv[1] if isdir(argv[1]) else False
+except:
+    figpath = False
 
 init_fig()
-save_figs = False  # subfolder fig must exist if set to True
-
 
 # colors for colorblind from http://www.cookbook-r.com/Graphs/Colors_(ggplot2)
 col = ["#D55E00", "#E69F00", "#F0E442", "#009E73", "#56B4E9", "#0072B2", "#CC79A7", "#999999"]
@@ -23,6 +28,7 @@ A2 = np.load('results/CNMF-HRshapes.npz')['A2'].item()
 N = A2.shape[1]
 ssub = np.load('results/decimate.npz')['ssub'].item()
 srt = cse.utilities.order_components(A2, ssub[1][0])[-1]
+ssubLR = np.load('results/decimate-LR.npz')['ssub'].item()
 
 #
 
@@ -45,37 +51,38 @@ def GetBox(centers, R, dims):
     return box
 
 
-boxes = [GetBox(center_of_mass(s), [24, 24], [512, 512]) for s in shapes]
+boxes = [GetBox(center_of_mass(s), [14, 14], [512, 512]) for s in shapes]
 fig = plt.figure(figsize=(25, 15))
 for k, neuronId in enumerate(srt[np.array([0, 39, 79, 119])]):
-    ax0 = fig.add_axes([.04, .763 - .24 * k, .957, .223])
+    ax0 = fig.add_axes([.02, .763 - .24 * k, .977, .223])
     mi = np.inf
     for i, ds in enumerate(dsls):
-        l, = plt.plot(ssub[ds][0][neuronId], ['-', '-', '--'][i], label='%dx%d' % (ds, ds),
-                      alpha=1., clip_on=False, zorder=10, lw=3, c=[green, cyan, orange][i])
+        l, = plt.plot(ssub[ds][0][neuronId] - ssub[ds][3][neuronId], ['-', '-', '--'][i],
+                      label='%dx%d' % (ds, ds), alpha=1., clip_on=False, zorder=10,
+                      lw=3, c=[green, yellow, vermillon][i])
         if i == 1:
             l.set_dashes([14, 10])
-        mi0 = np.min(ssub[ds][0][neuronId])
-        if mi0 < mi:
-            mi = mi0
+    z = minimize_scalar(
+        lambda x: np.sum((ssub[1][0][neuronId] - ssub[1][3][neuronId] -
+                          x * (ssubLR[4][0][neuronId] - ssubLR[4][3][neuronId]))**2))['x']
+    plt.plot(z * (ssubLR[4][0][neuronId] - ssubLR[4][3][neuronId]),
+             clip_on=False, zorder=-10, lw=3, c=cyan)
     lb, ub = plt.ylim()
-    maS = 0
-    for ds in dsls:
-        maS0 = np.max(ssub[ds][2][neuronId])
-        if maS0 > maS:
-            maS = maS0
+    ma = np.max([ssub[ds][2][neuronId].max() for ds in dsls])
+    ma = max(ma, ssubLR[4][2][neuronId].max() * z)
     for i, ds in enumerate(dsls):
-        plt.plot(2 * ssub[ds][2][neuronId] + mi - 2.2 *
-                 maS, alpha=1., c=[green, cyan, orange][i])
-    plt.ylim(mi - 2.2 * maS, ub)
-    plt.legend(frameon=False, ncol=len(dsls),
-               loc=[.068, .81], columnspacing=12.9)
+        l, = plt.plot(.65 * ub * ssub[ds][2][neuronId] / ma - .7 * ub,
+                      ['-', '-', '--'][i], alpha=1., c=[green, yellow, vermillon][i])
+    if i == 1:
+        l.set_dashes([14, 10])
+    plt.plot(z * .65 * ub * ssubLR[4][2][neuronId] / ma - .7 * ub, alpha=1., c=cyan, zorder=-10)
+    plt.ylim(-.7 * ub, ub)
+    plt.legend(frameon=False, ncol=len(dsls), loc=[.07, .81], columnspacing=14.3)
     plt.xticks(range(0, T, ticksep * fps), ['', '', ''])
-    plt.yticks([0, 1000 * int(plt.ylim()[1]) / 1000],
-               [0, int(plt.ylim()[1]) / 1000])
+    plt.yticks([])
     simpleaxis(plt.gca())
     for i, ds in enumerate(dsls):
-        ax = fig.add_axes([[.185, .46, .75][i], .835 - .24 * k, .035, .2625])
+        ax = fig.add_axes([[.167, .463, .78][i], .835 - .24 * k, .035, .2625])
         ss = downscale_local_mean(
             shapes[neuronId], (ds, ds)).repeat(ds, 0).repeat(ds, 1)
         ax.imshow(ss[map(lambda a: slice(*a), boxes[neuronId])],
@@ -85,7 +92,5 @@ for k, neuronId in enumerate(srt[np.array([0, 39, 79, 119])]):
                 verticalalignment='center', transform=ax.transAxes)
 ax0.set_xticklabels(range(0, T / fps, ticksep))
 ax0.set_xlabel('Time [s]', labelpad=-15)
-ax0.set_ylabel('Activity and Fluorescence [a.u.]', labelpad=5, y=2.05)
-if save_figs:
-    plt.savefig('fig/traces.pdf')
-plt.show()
+ax0.set_ylabel('Activity and Fluorescence [a.u.]', labelpad=5, y=2.1)
+plt.savefig(figpath + '/traces.pdf') if figpath else plt.show(block=True)

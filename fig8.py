@@ -4,26 +4,24 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import tifffile
 from skimage.filters import gaussian
-from functions import init_fig, simpleaxis, noclip
+from functions import init_fig, simpleaxis, noclip, gfp, showpause
 import ca_source_extraction as cse
 
+try:
+    from sys import argv
+    from os.path import isdir
+    figpath = argv[1] if isdir(argv[1]) else False
+except:
+    figpath = False
 
 init_fig()
-save_figs = False  # subfolder fig must exist if set to True
+
 plt.rc('font', size=20, **{'family': 'sans-serif', 'sans-serif': ['Computer Modern']})
 
 
 # colors for colorblind from http://www.cookbook-r.com/Graphs/Colors_(ggplot2)
 col = ["#D55E00", "#E69F00", "#F0E442", "#009E73", "#56B4E9", "#0072B2", "#CC79A7", "#999999"]
 [vermillon, orange, yellow, green, cyan, blue, purple, grey] = col
-# define colormap
-cdict = {'red': ((0.0, 0.0, 0.0),
-                 (1.0, 0.0, 0.0)),
-         'green': ((0.0, 0.0, 0.0),
-                   (1.0, 1.0, 1.0)),
-         'blue': ((0.0, 0.0, 0.0),
-                  (1.0, 0.0, 0.0))}
-gfp = matplotlib.colors.LinearSegmentedColormap('GFP_colormap', cdict, 256)
 
 #
 
@@ -78,15 +76,14 @@ plt.yticks(range(1000, 4000, 1000), range(1000, 4000, 1000), fontsize=16)
 cb.ax.yaxis.label.set_font_properties(
     matplotlib.font_manager.FontProperties(size=16))
 plt.subplots_adjust(.005, 0, .89, 1)
-if save_figs:
-    plt.savefig('fig/data-interleave.pdf')
-plt.show()
-
+plt.savefig(figpath + '/data-interleave.pdf') if figpath else showpause()
 #
 
 #
 
 # plot correlations
+
+init_fig()
 
 
 def plotCorr(ssubs, compare, dsls, labels=None,
@@ -118,7 +115,8 @@ def plotCorr(ssubs, compare, dsls, labels=None,
     simpleaxis(plt.gca())
     plt.xticks(dsls, ['1', '', '', '', '', '8x8',
                       '', '16x16', '24x24', '32x32'])
-    plt.yticks(*[np.arange(np.round(plt.ylim()[1], 1), plt.ylim()[0], -.2)] * 2)
+    # plt.yticks(*[np.arange(np.round(plt.ylim()[1], 1), plt.ylim()[0], -.2)] * 2)
+    plt.yticks(*[[.4, .6, .8, 1.0]] * 2)
     plt.xlim(dsls[0], dsls[-1])
     plt.ylabel('Correlation w/ undecimated $C_1$/$S_1$', y=.42, labelpad=1)
     if labels is not None:
@@ -143,16 +141,14 @@ ax = plt.gca().add_artist(first_legend)
 plt.legend(handles=[l1, l2], loc=(0, .21))
 plt.ylim(.36, 1)
 plt.subplots_adjust(.13, .15, .94, .96)
-if save_figs:
-    plt.savefig('fig/Corr-interleave.pdf')
-plt.show()
+plt.savefig(figpath + '/Corr-interleave.pdf') if figpath else showpause()
 
 #
 
 # artificial data, from 'true' generative model by shuffling residuals in time
 
-ssub = np.load('results/decimate-shuffled.npz')['ssub'].item()
-il2 = np.load('results/decimate-interleave-shuffled.npz')['il2'].item()
+ssub = np.load('results/decimate-stratshuffled.npz')['ssub'].item()
+il2 = np.load('results/decimate-interleave-stratshuffled.npz')['il2'].item()
 
 plt.figure()
 plotCorr([ssub, il2], trueC, dsls, ca_or_spikes='ca',
@@ -163,8 +159,6 @@ l1, = plt.plot([0, 1], [-1, -1], lw=4, c='k', label='denoised')
 l2, = plt.plot([0, 1], [-1, -1], lw=4, c='k', ls='--', label='deconvolved')
 plt.ylabel(r'Correlation w/ ground truth $C$\textsuperscript{s}/$S$\textsuperscript{s}',
            y=.42, labelpad=3)
-plt.ylim(.46, 1)
+plt.ylim(.36, 1)
 plt.subplots_adjust(.13, .15, .94, .96)
-if save_figs:
-    plt.savefig('fig/Corr-interleave-shuffled.pdf')
-plt.show()
+plt.savefig(figpath + '/Corr-interleave-stratshuffled.pdf') if figpath else plt.show(block=True)
