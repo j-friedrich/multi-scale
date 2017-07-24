@@ -1,5 +1,6 @@
 import matplotlib
 import matplotlib.pyplot as plt
+import numpy as np
 
 
 def init_fig():
@@ -11,6 +12,7 @@ def init_fig():
     plt.rc('axes', linewidth=2)
     plt.rc('xtick.major', size=10, width=1.5)
     plt.rc('ytick.major', size=10, width=1.5)
+    plt.rc('hatch', linewidth=1.2)
     plt.ion()
 
 
@@ -31,6 +33,16 @@ def noclip(e):
 def showpause(t=2):
     plt.show()
     plt.pause(t)
+
+
+def IQRfill(cor, dsls, c="#E69F00", hatch=None, ls='-'):
+    y1 = np.percentile(cor, 75, 0)
+    y2 = np.percentile(cor, 25, 0)
+    plt.plot(dsls[:cor.shape[1]], y1, ls=ls, lw=2, c=c)
+    plt.plot(dsls[:cor.shape[1]], y2, ls=ls, lw=2, c=c)
+    plt.fill_between(dsls[:cor.shape[1]], y1, y2, facecolor=c if hatch is None else 'none',
+                     edgecolor=c, alpha=.3 if hatch is None else 1, hatch=hatch, lw=0,
+                     zorder=-11 if hatch is not None else 0)
 
 
 # define colormaps

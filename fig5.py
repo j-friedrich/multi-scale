@@ -1,11 +1,15 @@
 import numpy as np
+import matplotlib
 import matplotlib.pyplot as plt
 from skimage.transform import downscale_local_mean
 from skimage.filters import gaussian
 from scipy.ndimage.measurements import center_of_mass
 from scipy.optimize import minimize_scalar
 from functions import init_fig, simpleaxis
-import ca_source_extraction as cse
+import ca_source_extraction as cse  # github.com/j-friedrich/Constrained_NMF/tree/multi-scale_paper
+
+if matplotlib.__version__[0] == '2':
+    matplotlib.style.use('classic')
 
 try:
     from sys import argv
@@ -26,9 +30,12 @@ col = ["#D55E00", "#E69F00", "#F0E442", "#009E73", "#56B4E9", "#0072B2", "#CC79A
 
 A2 = np.load('results/CNMF-HRshapes.npz')['A2'].item()
 N = A2.shape[1]
+b2 = np.load('results/CNMF-HRshapes.npz')['b2']
 ssub = np.load('results/decimate.npz')['ssub'].item()
 srt = cse.utilities.order_components(A2, ssub[1][0])[-1]
 ssubLR = np.load('results/decimate-LR.npz')['ssub'].item()
+A2LR = np.load('results/CNMF-LRshapes.npz')['A2'].item()
+b2LR = np.load('results/CNMF-LRshapes.npz')['b2']
 
 #
 
@@ -38,7 +45,6 @@ dsls = [1, 4, 16]
 fps = 20
 ticksep = 40
 shapes = A2.T.toarray().reshape(-1, 512, 512)
-shapes = np.asarray([gaussian(a, 1) for a in shapes])
 N, T = ssub[1][0].shape
 
 
@@ -51,46 +57,59 @@ def GetBox(centers, R, dims):
     return box
 
 
+def baseline(s, f, b, bl):
+    return ((f.ravel() * s.ravel().dot(b.ravel())) / s.ravel().dot(s.ravel()) + bl)
+
+
+def df(a, s, f, b, bl):
+    return (a - bl) / baseline(s, f, b, bl)
+
+
 boxes = [GetBox(center_of_mass(s), [14, 14], [512, 512]) for s in shapes]
 fig = plt.figure(figsize=(25, 15))
 for k, neuronId in enumerate(srt[np.array([0, 39, 79, 119])]):
-    ax0 = fig.add_axes([.02, .763 - .24 * k, .977, .223])
+    ax0 = fig.add_axes([.023, .775 - .244 * k, .973, .223])
     mi = np.inf
     for i, ds in enumerate(dsls):
-        l, = plt.plot(ssub[ds][0][neuronId] - ssub[ds][3][neuronId], ['-', '-', '--'][i],
+        l, = plt.plot(df(ssub[ds][0][neuronId], shapes[neuronId], ssub[ds][1],
+                         b2, ssub[ds][3][neuronId]), ['-', '-', '--'][i],
                       label='%dx%d' % (ds, ds), alpha=1., clip_on=False, zorder=10,
                       lw=3, c=[green, yellow, vermillon][i])
         if i == 1:
             l.set_dashes([14, 10])
-    z = minimize_scalar(
-        lambda x: np.sum((ssub[1][0][neuronId] - ssub[1][3][neuronId] -
-                          x * (ssubLR[4][0][neuronId] - ssubLR[4][3][neuronId]))**2))['x']
-    plt.plot(z * (ssubLR[4][0][neuronId] - ssubLR[4][3][neuronId]),
-             clip_on=False, zorder=-10, lw=3, c=cyan)
+    foo = df(ssub[1][0][neuronId], shapes[neuronId], ssub[1][1], b2, ssub[1][3][neuronId])
+    bar = df(ssubLR[4][0][neuronId], A2LR.T.toarray()[neuronId], ssubLR[4][1],
+             b2LR, ssubLR[4][3][neuronId])
+    z = minimize_scalar(lambda x: np.sum((foo - x * bar)**2))['x']
+    plt.plot(z * bar, clip_on=False, zorder=-10, lw=3, c=cyan)
     lb, ub = plt.ylim()
-    ma = np.max([ssub[ds][2][neuronId].max() for ds in dsls])
-    ma = max(ma, ssubLR[4][2][neuronId].max() * z)
     for i, ds in enumerate(dsls):
-        l, = plt.plot(.65 * ub * ssub[ds][2][neuronId] / ma - .7 * ub,
+        scale = baseline(shapes[neuronId], ssub[ds][1], b2, ssub[ds][3][neuronId]).mean()
+        l, = plt.plot(ssub[ds][2][neuronId] / scale - .7 * ub,
                       ['-', '-', '--'][i], alpha=1., c=[green, yellow, vermillon][i])
     if i == 1:
         l.set_dashes([14, 10])
-    plt.plot(z * .65 * ub * ssubLR[4][2][neuronId] / ma - .7 * ub, alpha=1., c=cyan, zorder=-10)
+    plt.plot(z * ssubLR[4][2][neuronId] / scale - .7 * ub, alpha=1., c=cyan, zorder=-10)
     plt.ylim(-.7 * ub, ub)
-    plt.legend(frameon=False, ncol=len(dsls), loc=[.07, .81], columnspacing=14.3)
+    plt.legend(frameon=False, ncol=len(dsls), loc=[.073, .775], columnspacing=14.2)
     plt.xticks(range(0, T, ticksep * fps), ['', '', ''])
-    plt.yticks([])
+    tmp = [500, 300, 100, 100][k]
+    plt.plot([0, 0], [0, 1], c='k', lw=5, clip_on=False, zorder=11)
+    plt.text(7, 1, '100\%', verticalalignment='center')
     simpleaxis(plt.gca())
+    plt.gca().spines['left'].set_visible(False)
+    plt.yticks([])
     for i, ds in enumerate(dsls):
-        ax = fig.add_axes([[.167, .463, .78][i], .835 - .24 * k, .035, .2625])
+        ax = fig.add_axes([[.17, .467, .78][i], .838 - .244 * k, .035, .2625])
         ss = downscale_local_mean(
-            shapes[neuronId], (ds, ds)).repeat(ds, 0).repeat(ds, 1)
+            gaussian(shapes[neuronId], 1), (ds, ds)).repeat(ds, 0).repeat(ds, 1)
         ax.imshow(ss[map(lambda a: slice(*a), boxes[neuronId])],
                   cmap='hot', interpolation='nearest')
         ax.axis('off')
-        ax.text(1.3, .5, '%.3f' % (np.corrcoef(ssub[ds][0][neuronId], ssub[1][0][neuronId])[0, 1]),
+        ax.text(1.25, .5, '%.3f' % (np.corrcoef(ssub[ds][0][neuronId],
+                                                ssub[1][0][neuronId])[0, 1]),
                 verticalalignment='center', transform=ax.transAxes)
 ax0.set_xticklabels(range(0, T / fps, ticksep))
 ax0.set_xlabel('Time [s]', labelpad=-15)
-ax0.set_ylabel('Activity and Fluorescence [a.u.]', labelpad=5, y=2.1)
+ax0.set_ylabel('Activity and $\Delta$F/F', labelpad=10, y=1.5)
 plt.savefig(figpath + '/traces.pdf') if figpath else plt.show(block=True)

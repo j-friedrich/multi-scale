@@ -2,7 +2,7 @@ import numpy as np
 from numpy import min, max, asarray, percentile, zeros, exp, ones, dot, where,\
     r_, ix_, arange, nan_to_num, prod, repeat, argsort, outer, clip
 from time import time
-from scipy.linalg import eigh
+from scipy.linalg import eigh, qr
 
 
 def HALS4activity(data, S, activity, iters=1, nonneg=True):
@@ -126,9 +126,11 @@ def LocalNMF(data, centers, sig, iters=10, verbose=False, adaptBias=True,
         dims0 = dims
     else:  # no compression
         if D == 4:
-            activity = data[:, centers[:, 0], centers[:, 1], centers[:, 2]].T.astype('float32')
+            activity = data[:, centers[:, 0].astype(int), centers[:, 1].astype(int),
+                            centers[:, 2].astype(int)].T.astype('float32')
         else:
-            activity = data[:, centers[:, 0], centers[:, 1]].T.astype('float32')
+            activity = data[:, centers[:, 0].astype(int),
+                            centers[:, 1].astype(int)].T.astype('float32')
         dims0 = dims
 
     if method == 'subsample':
@@ -142,11 +144,11 @@ def LocalNMF(data, centers, sig, iters=10, verbose=False, adaptBias=True,
         Om = np.random.randn(np.prod(dims0[1:]), M).astype('float32')
         # B = data0.dot(data0.T.dot(data0.dot(Om)))
         B = data0.dot(Om)
-        Lmatrix = np.linalg.qr(B)[0]
+        Lmatrix = qr(B, mode='economic')[0]
         Om = np.random.randn(dims0[0], M).astype('float32')
         # B = data0.T.dot(data0.dot(data0.T.dot(Om)))
         B = data0.T.dot(Om)
-        Rmatrix = np.linalg.qr(B)[0].T
+        Rmatrix = qr(B, mode='economic')[0].T
         dataL = Lmatrix.T.dot(data0)
         dataR = data0.dot(Rmatrix.T)
 
@@ -194,8 +196,11 @@ def LocalNMF(data, centers, sig, iters=10, verbose=False, adaptBias=True,
                 activity = HALS4activity(data0, S, activity, nonneg=nonneg)
 
     ### Back to full data ##
-        activity = ones((L + adaptBias, dims[0]),
-                        dtype='float32') * activity.mean(1).reshape(-1, 1)
+        if method == 'svd':
+            activity = activity.dot(V.T)
+        if mb:
+            activity = ones((L + adaptBias, dims[0]),
+                            dtype='float32') * activity.mean(1).reshape(-1, 1)
         if D == 4:
             S = repeat(repeat(repeat(S.reshape((-1,) + dims0[1:]),
                                      ds[0], 1), ds[1], 2), ds[2], 3).reshape(L + adaptBias, -1)

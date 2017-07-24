@@ -34,9 +34,7 @@ if cluster:
 
 #
 
-# ## infer shapes on original high-res data
-
-# infer shapes on full, half or quarter of data
+# ## infer shapes on full, half or quarter of original high-res data
 for batch, batchname in enumerate(['', '-Aon1stHalf', '-Aon1stQuarter']):
     try:  # ## load result if saved
         A2, b2, C2, f, A_m, C_m, sn = itemgetter(
@@ -146,7 +144,7 @@ for batch, batchname in enumerate(['', '-Aon1stHalf', '-Aon1stQuarter']):
         if shuffled:  # data, from 'true' generative model by shuffling residuals in time
             # ## load or generate shuffled data
             try:
-                Yr = np.load('YrShuffled.npy', mmap_mode='r')
+                Yr = np.load('YrStratShuffled.npy', mmap_mode='r')
             except:
                 Yr = np.load('Yr.npy', mmap_mode='r')
                 # load shapes inferred on original high-res data
@@ -159,17 +157,25 @@ for batch, batchname in enumerate(['', '-Aon1stHalf', '-Aon1stQuarter']):
                 residual = Yr - A2.dot(ssub1[0]).astype('float32') - \
                     b2.dot(ssub1[1]).astype('float32')
                 np.random.seed(0)
-                YrShuffled = Yr - residual + \
-                    np.apply_along_axis(np.random.permutation, 1, residual)
-                np.save('YrShuffled', YrShuffled)
+
+                def stratified_reshuffle(signal, res):
+                    return res[np.apply_along_axis(np.random.permutation, 1,
+                                                   np.argsort(signal).reshape(200, 10))
+                               .ravel()[np.argsort(np.argsort(signal))]]
+
+                YrShuffled = Yr - residual
+                # + np.apply_along_axis(np.random.permutation, 1, residual)
+                YrShuffled += np.asarray([stratified_reshuffle(y, residual[i])
+                                          for i, y in enumerate(YrShuffled)])
+                np.save('YrStratShuffled', YrShuffled)
                 del YrShuffled
                 del residual
-                Yr = np.load('YrShuffled.npy', mmap_mode='r')
+                Yr = np.load('YrStratShuffled.npy', mmap_mode='r')
             # ## get spatial components on high-resolution data
             try:  # load shapes inferred on shuffled high-res data
                 A2, b2, C2, f, A_m, C_m, sn = itemgetter(
                     'A2', 'b2', 'C2', 'f', 'A_m', 'C_m', 'sn')(
-                    np.load('results/CNMF-HRshapes-shuffled' + batchname + '.npz'))
+                    np.load('results/CNMF-HRshapes-stratshuffled' + batchname + '.npz'))
                 A2 = A2.item()
             except:
                 A2, b2, C2, f, A_m, C_m, sn = itemgetter(
@@ -195,11 +201,11 @@ for batch, batchname in enumerate(['', '-Aon1stHalf', '-Aon1stQuarter']):
                 C2 *= z.reshape(-1, 1)
 
                 # save intermediate results
-                np.savez_compressed('results/CNMF-HRshapes-shuffled' + batchname + '.npz',
+                np.savez_compressed('results/CNMF-HRshapes-stratshuffled' + batchname + '.npz',
                                     **{'A2': A2, 'b2': b2, 'C2': C2, 'f': f,
                                        'A_m': A_m, 'C_m': C_m, 'sn': sn})
                 if batch:
-                    Yr = np.load('YrShuffled.npy', mmap_mode='r')
+                    Yr = np.load('YrStratShuffled.npy', mmap_mode='r')
             N = A2.shape[1]
         else:
             Yr = np.load('Yr.npy', mmap_mode='r')
@@ -231,7 +237,7 @@ for batch, batchname in enumerate(['', '-Aon1stHalf', '-Aon1stQuarter']):
         print('DONE!')
 
         # save results
-        np.savez_compressed('results/decimate-shuffled' + batchname + '.npz' if shuffled
+        np.savez_compressed('results/decimate-stratshuffled' + batchname + '.npz' if shuffled
                             else 'results/decimate' + batchname + '.npz',
                             **{'ssub': ssub, 'ssubX': ssubX})
 
@@ -306,7 +312,7 @@ for batch, batchname in enumerate(['', '-Aon1stHalf', '-Aon1stQuarter']):
             print('DONE!')
 
             # save results
-            np.savez_compressed('results/decimate-shuffled-LR.npz' if shuffled
+            np.savez_compressed('results/decimate-stratshuffled-LR.npz' if shuffled
                                 else 'results/decimate-LR.npz',
                                 **{'ssub': ssub, 'ssubX': ssubX})
 
@@ -316,7 +322,7 @@ for batch, batchname in enumerate(['', '-Aon1stHalf', '-Aon1stQuarter']):
 
             # load shapes inferred on high-res data
             A2, b2, C2, f, A_m, C_m, sn = itemgetter('A2', 'b2', 'C2', 'f', 'A_m', 'C_m', 'sn')(
-                np.load('results/CNMF-HRshapes-shuffled.npz' if shuffled
+                np.load('results/CNMF-HRshapes-stratshuffled.npz' if shuffled
                         else 'results/CNMF-HRshapes.npz'))
             A2 = A2.item()
             N = A2.shape[1]
@@ -342,7 +348,7 @@ for batch, batchname in enumerate(['', '-Aon1stHalf', '-Aon1stQuarter']):
             print('DONE!')
 
             # save results
-            np.savez_compressed('results/decimate-interleave-shuffled.npz' if shuffled
+            np.savez_compressed('results/decimate-interleave-stratshuffled.npz' if shuffled
                                 else 'results/decimate-interleave.npz', **{'il': il, 'il2': il2})
 
 

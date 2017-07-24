@@ -5,7 +5,10 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 import tifffile
 from skimage.filters import gaussian
 from functions import init_fig, simpleaxis, noclip, gfp, showpause
-import ca_source_extraction as cse
+import ca_source_extraction as cse  # github.com/j-friedrich/Constrained_NMF/tree/multi-scale_paper
+
+if matplotlib.__version__[0] == '2':
+    matplotlib.style.use('classic')
 
 try:
     from sys import argv
@@ -52,11 +55,9 @@ A_or = np.transpose([gaussian(a.reshape(d1, d2), 1).ravel() for a in A_or.T])
 # Plot decimated data with interleaving grid
 
 fig = plt.figure(figsize=(7.1, 6))
-crd = cse.utilities.plot_contours(
-    A_or, Ymax, thr=0.9, numbercolor='w', colors='w')
+crd = cse.utilities.plot_contours(A_or, Ymax, thr=0.9, numbercolor='w', colors='w')
 ax = plt.gca()
-im = ax.imshow(Yr.reshape(d1, d2, T / 10, 10).mean(-1).max(-1).T,
-               cmap=gfp, vmin=400, vmax=4000)
+im = ax.imshow(Yr.reshape(d1, d2, T / 10, 10).mean(-1).max(-1).T, cmap=gfp, vmin=400, vmax=4000)
 ax.set_xticks([])
 ax.set_yticks([])
 plt.axis('off')
@@ -73,8 +74,7 @@ cax = divider.append_axes("right", size="5%", pad=0.05)
 cb = plt.colorbar(im, cax=cax, label='Maximum Projection')
 cb.set_ticks(range(1000, 4000, 1000))
 plt.yticks(range(1000, 4000, 1000), range(1000, 4000, 1000), fontsize=16)
-cb.ax.yaxis.label.set_font_properties(
-    matplotlib.font_manager.FontProperties(size=16))
+cb.ax.yaxis.label.set_font_properties(matplotlib.font_manager.FontProperties(size=16))
 plt.subplots_adjust(.005, 0, .89, 1)
 plt.savefig(figpath + '/data-interleave.pdf') if figpath else showpause()
 #
@@ -115,7 +115,6 @@ def plotCorr(ssubs, compare, dsls, labels=None,
     simpleaxis(plt.gca())
     plt.xticks(dsls, ['1', '', '', '', '', '8x8',
                       '', '16x16', '24x24', '32x32'])
-    # plt.yticks(*[np.arange(np.round(plt.ylim()[1], 1), plt.ylim()[0], -.2)] * 2)
     plt.yticks(*[[.4, .6, .8, 1.0]] * 2)
     plt.xlim(dsls[0], dsls[-1])
     plt.ylabel('Correlation w/ undecimated $C_1$/$S_1$', y=.42, labelpad=1)
@@ -129,10 +128,8 @@ il2 = np.load('results/decimate-interleave.npz')['il2'].item()
 
 plt.figure()
 first_legend = plotCorr([ssub, il2], trueC, dsls, ca_or_spikes='ca',
-                        labels=['no interleaving', 'interleaving'],
-                        colors=[cyan, green])
-plotCorr([ssub, il2], trueSpikes, dsls, ca_or_spikes='spikes', ls='--',
-         colors=[cyan, green])
+                        labels=['no interleaving', 'interleaving'], colors=[cyan, green])
+plotCorr([ssub, il2], trueSpikes, dsls, ca_or_spikes='spikes', ls='--', colors=[cyan, green])
 l1, = plt.plot([0, 1], [-1, -1], lw=4, c='k', label='denoised')
 l2, = plt.plot([0, 1], [-1, -1], lw=4, c='k', ls='--', label='deconvolved')
 # Add the legend manually to the current Axes.
@@ -151,10 +148,8 @@ ssub = np.load('results/decimate-stratshuffled.npz')['ssub'].item()
 il2 = np.load('results/decimate-interleave-stratshuffled.npz')['il2'].item()
 
 plt.figure()
-plotCorr([ssub, il2], trueC, dsls, ca_or_spikes='ca',
-         colors=[cyan, green])
-plotCorr([ssub, il2], trueSpikes, dsls, ca_or_spikes='spikes', ls='--',
-         colors=[cyan, green])
+plotCorr([ssub, il2], trueC, dsls, ca_or_spikes='ca', colors=[cyan, green])
+plotCorr([ssub, il2], trueSpikes, dsls, ca_or_spikes='spikes', ls='--', colors=[cyan, green])
 l1, = plt.plot([0, 1], [-1, -1], lw=4, c='k', label='denoised')
 l2, = plt.plot([0, 1], [-1, -1], lw=4, c='k', ls='--', label='deconvolved')
 plt.ylabel(r'Correlation w/ ground truth $C$\textsuperscript{s}/$S$\textsuperscript{s}',

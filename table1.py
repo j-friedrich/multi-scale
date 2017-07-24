@@ -16,8 +16,7 @@ runs = 10
 
 # load data
 
-t_data = [Timer(lambda: np.load('data_zebrafish.npy'))
-          .timeit(1) for _ in range(runs)]
+t_data = [Timer(lambda: np.load('data_zebrafish.npy')).timeit(1) for _ in range(runs)]
 
 
 # decimate
@@ -48,30 +47,25 @@ t_NMF_old = np.asarray([OldLocalNMF(data, centers, sig, iters=25)[0]
 
 # dF/F
 
-activity = LocalNMF(data, centers, sig, iters=5, mb=30, iters0=30, ds=[3, 3])[2]
-b = np.apply_along_axis(lambda x: percentile_filter(
-    x, 20, 300, mode='nearest'), 1, activity[:-1])
-series = (activity[:-1] - b) / (b + 10)
-series -= series.min(1).reshape(-1, 1)
-
-
-def foo(activityQ):
+def df(activity):
     b = np.apply_along_axis(lambda x: percentile_filter(
         x, 20, 300, mode='nearest'), 1, activity[:-1])
     series = (activity[:-1] - b) / (b + 10)
     series -= series.min(1).reshape(-1, 1)
     return series
 
-t_dF = [Timer(lambda: foo(activity)).timeit(1) for _ in range(runs)]
+activity = LocalNMF(data, centers, sig, iters=5, mb=30, iters0=30, ds=[3, 3])[2]
+series = df(activity)
+t_dF = [Timer(lambda: df(activity)).timeit(1) for _ in range(runs)]
 
 
 # denoise & deconvolve
 
-def bar(s):
-    tmp = cse.deconvolution.estimate_parameters(s, 1)
-    constrained_oasisAR1(s, .97 * tmp[0][0], tmp[1], True)
+def denoise(s):
+    tmp = cse.deconvolution.estimate_parameters(s, 1, fudge_factor=.97)
+    constrained_oasisAR1(s, tmp[0][0], tmp[1], True)
 
-t_OASIS = [Timer(lambda: map(bar, series.astype(float)))
+t_OASIS = [Timer(lambda: map(denoise, series.astype(float)))
            .timeit(1) for _ in range(runs)]
 
 t_CVXPY = [Timer(lambda: map(lambda x: cse.deconvolution

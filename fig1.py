@@ -1,8 +1,12 @@
 import numpy as np
+import matplotlib
 import matplotlib.pyplot as plt
 from CNMF import LocalNMF, OldLocalNMF
 from functions import init_fig, simpleaxis, showpause
 import ca_source_extraction as cse  # github.com/j-friedrich/Constrained_NMF/tree/multi-scale_paper
+
+if matplotlib.__version__[0] == '2':
+    matplotlib.style.use('classic')
 
 try:
     from sys import argv
@@ -83,7 +87,7 @@ try:
     MSE_svd = np.load('results/MSE_svd.npy')
 except:
     MSE_svd = np.asarray(
-        [LocalNMF(data, centers, sig, verbose=True, iters=iters, mb=1, method='svd')[0]
+        [LocalNMF(data, centers, sig, verbose=True, iters=iters, iters0=10, mb=1, method='svd')[0]
          for _ in range(runs)])
     np.save('results/MSE_svd.npy', MSE_svd)
 
@@ -93,7 +97,7 @@ try:
 except:
     MSE_negsvd = np.asarray(
         [LocalNMF(data, centers, sig, verbose=True, iters=iters,
-                  mb=1, method='svd', nonneg=False)[0] for _ in range(runs)])
+                  iters0=10, mb=1, method='svd', nonneg=False)[0] for _ in range(runs)])
     np.save('results/MSE_negsvd.npy', MSE_negsvd)
 
 # random
@@ -101,8 +105,8 @@ try:
     MSE_random = np.load('results/MSE_random.npy')
 except:
     MSE_random = np.asarray(
-        [LocalNMF(data, centers, sig, verbose=True, iters=iters, mb=1, method='random')[0]
-         for _ in range(runs)])
+        [LocalNMF(data, centers, sig, verbose=True, iters=iters,
+                  iters0=10, mb=1, method='random')[0] for _ in range(runs)])
     np.save('results/MSE_random.npy', MSE_random)
 
 # decimate + svd
@@ -110,8 +114,8 @@ try:
     MSE_decsvd = np.load('results/MSE_dec+svd.npy')
 except:
     MSE_decsvd = np.asarray(
-        [LocalNMF(data, centers, sig, verbose=True, iters=iters, mb=30, method='svd', M=60)[0]
-         for _ in range(runs)])
+        [LocalNMF(data, centers, sig, verbose=True, iters=iters,
+                  iters0=10, mb=30, method='svd', M=60)[0] for _ in range(runs)])
     np.save('results/MSE_dec+svd.npy', MSE_decsvd)
 
 # decimate + svd without enforcing nonneg activities
@@ -119,9 +123,8 @@ try:
     MSE_decnegsvd = np.load('results/MSE_dec+negsvd.npy')
 except:
     MSE_decnegsvd = np.asarray(
-        [LocalNMF(data, centers, sig, verbose=True, iters=iters, mb=30,
-                  method='svd', nonneg=False, M=60)[0]
-         for _ in range(runs)])
+        [LocalNMF(data, centers, sig, verbose=True, iters=iters,
+                  iters0=10, mb=30, method='svd', nonneg=False, M=60)[0] for _ in range(runs)])
     np.save('results/MSE_dec+negsvd.npy', MSE_decnegsvd)
 
 # decimate + random
@@ -129,8 +132,8 @@ try:
     MSE_decrandom = np.load('results/MSE_dec+random.npy')
 except:
     MSE_decrandom = np.asarray(
-        [LocalNMF(data, centers, sig, verbose=True, iters=iters, mb=30, method='random', M=60)[0]
-         for _ in range(runs)])
+        [LocalNMF(data, centers, sig, verbose=True, iters=iters,
+                  iters0=10, mb=30, method='random', M=60)[0] for _ in range(runs)])
     np.save('results/MSE_dec+random.npy', MSE_decrandom)
 
 
@@ -142,7 +145,7 @@ l, u = .9965, 1.0105
 def adjust():
     plt.xticks(*[[0, 5, 10]] * 2)
     plt.yticks(*[[1, 1.01], ['1.00', 1.01]])
-    plt.xlim(0, 9)
+    plt.xlim(0, 8.5)
     plt.ylim(l, u)
     plt.xlabel('Wall time [s]')
     simpleaxis(plt.gca())
@@ -162,7 +165,7 @@ plt.xticks(*[[0, 10, 20]] * 2)
 plt.yticks(*[[1, 1.05], ['1.00', 1.05]])
 plt.xlim(0, 30)
 plt.ylim(l, 1.052)
-plt.plot((0, 9, 9), (u, u, l), 'k--')
+plt.plot((0, 8.5, 8.5), (u, u, l), 'k--')
 plt.savefig(figpath + '/MSE_order.pdf') if figpath else showpause()
 
 
@@ -201,12 +204,6 @@ for k, (d, label) in enumerate([(MSE_nodec, 'none'), (MSE_decT[:, 4], 'decimate'
                                 (MSE_decrandom, 'dec.+random'), (MSE_decnegsvd, 'dec.+svd')]):
     plt.plot(*np.min(d, 0).T / np.array([[1], [z]]), label=label, c=col[[0, 4, 7, 6, 7, 6][k]],
              ls=['-', '--'][k // 4])
-lg = plt.legend(bbox_to_anchor=(1.05, 1.05))  # , title='compression')
+lg = plt.legend(bbox_to_anchor=(1.05, 1.05))
 adjust()
-# # plt.ylabel('normalized MSE', labelpad=-25)
-# plt.xticks(*[[0, 10]] * 2)
-# plt.yticks(*[[1, 1.02], ['1.00', 1.02]])
-# plt.xlim(0, 17)
-# plt.ylim(l, 1.025)
-# plt.plot((0, 9, 9), (u, u, l), 'k--')
 plt.savefig(figpath + '/MSE_other.pdf') if figpath else plt.show(block=True)

@@ -1,10 +1,13 @@
 import numpy as np
+import matplotlib
 import matplotlib.pyplot as plt
 from CNMF import LocalNMF, HALS4activity
-from functions import init_fig, simpleaxis, noclip, showpause
+from functions import init_fig, simpleaxis, IQRfill
 import ca_source_extraction as cse  # github.com/j-friedrich/Constrained_NMF/tree/multi-scale_paper
-import scipy
 import itertools
+
+if matplotlib.__version__[0] == '2':
+    matplotlib.style.use('classic')
 
 try:
     from sys import argv
@@ -65,7 +68,6 @@ for ds in dsls[1:]:
 
 
 # plot correlation values
-
 def foo(ssub, comp, shapes):
     N, T = comp.shape
     cc = np.corrcoef(shapes.reshape(N, -1)[:-1]) > .2
@@ -108,69 +110,43 @@ def foo(ssub, comp, shapes):
             mapIdx[list(idx)] = bestperm
         if np.any(mapIdx != range(N)):
             print ds, len(set(mapIdx)), mapIdx
-        cor[:, i] = np.array([np.corrcoef(ssub[ds][mapIdx[n]], comp[n])[0, 1] for n in range(N)])
+        cor[:, i] = np.array([np.corrcoef(ssub[ds][int(mapIdx[n])], comp[n])[0, 1]
+                              for n in range(N)])
         mapIdxs[:, i] = mapIdx
     return cor, mapIdxs
 
 
 fig = plt.figure(figsize=(6.5, 6))
-cor, mapIdx = foo(activityDSlr, activityDS[1], shapes)
-plt.plot(dsls, np.mean(cor, 0), lw=4, c=cyan,
-         label='1 phase\n imaging', clip_on=False)
-noclip(plt.errorbar(dsls, np.mean(cor, 0),
-                    yerr=np.std(cor, 0) / np.sqrt(len(cor)),
-                    lw=3, capthick=2, fmt='o', c=cyan, clip_on=False))
-cor, _ = foo(activityDS, activityDS[1], shapes)
-plt.plot(dsls, np.mean(cor, 0), lw=4, c=orange,
-         label='2 phase\n imaging', clip_on=False)
-noclip(plt.errorbar(dsls, np.mean(cor, 0),
-                    yerr=np.std(cor, 0) / np.sqrt(len(cor)),
-                    lw=3, capthick=2, fmt='o', c=orange, clip_on=False))
+for ssub, col in ((activityDSlr, cyan), (activityDS, orange)):
+    cor, mx = foo(ssub, activityDS[1], shapes)
+    if col == cyan:
+        mapIdx = mx
+    plt.plot(dsls, np.median(cor, 0), lw=3, c=col, clip_on=False,
+             label='1 phase\n imaging' if col == cyan else '2 phase\n imaging')
+    IQRfill(cor, dsls, col)
 plt.xlabel('Spatial decimation')
-simpleaxis(plt.gca())
+ax = plt.gca()
+simpleaxis(ax)
+ax.patch.set_visible(False)
 plt.xticks(dsls, ['1x1', '', '', '4x4', '6x6', '8x8', '12x12'])
-plt.yticks(*[np.round(np.arange(np.round(plt.ylim()[1], 1), plt.ylim()[0], -.1), 1)] * 2)
-plt.xlim(dsls[0], dsls[-1])
-plt.ylabel('Correlation')
-plt.legend(loc=(.01, .01), ncol=1)
-plt.subplots_adjust(.155, .15, .925, .96)
-plt.savefig(figpath + '/Corr_zebrafish.pdf') if figpath else showpause()
-
-
-# plot traces
-
-fig = plt.figure(figsize=(17, 6))
-for k, neuronId in enumerate([0, 14, 36]):
-    ax0 = fig.add_axes([.03, .71 - .3 * k, .967, .28])
-    for i, ds in enumerate([1, 2, 4, 8]):
-        l, = plt.plot(activityDS[ds][neuronId][:960], ['-', '-', '--', '-.'][i],
-                      c=[green, yellow, vermillon, 'k'][i], label='%dx%d' % (ds, ds))
-        if i == 1:
-            l.set_dashes([14, 10])
-    plt.legend(frameon=False, ncol=4, loc=[.05, .65], columnspacing=5.7, handletextpad=.1)
-    z = scipy.optimize.minimize_scalar(
-        lambda x: np.sum((activityDS[1][neuronId][:770] -
-                          x * activityDSlr[8][mapIdx[neuronId, 5]][:770])**2))['x']
-    plt.plot(z * activityDSlr[8][mapIdx[neuronId, 5]][:770], c=cyan, zorder=-11)
-    plt.xticks(range(0, 900, 600), ['', '', ''])
-    plt.xlim(0, 770)
-    plt.ylim(0, plt.ylim()[1] * [1.25, 1.2, 1.1][k])
-    tmp = [2, 7, 3][k]  # int(activityDS[ds][neuronId].max() / 100)-2
-    # plt.yticks([0, 100 * tmp], [0, tmp])
-    plt.yticks([])
-    simpleaxis(plt.gca())
-    for i, ds in enumerate([1, 2, 4, 8]):
-        ax = fig.add_axes([.18 + i * .225, .82 - .3 * k, .04, .24])
-        ss = (shapes[neuronId].reshape(shapes.shape[1] / ds, ds, shapes.shape[2] / ds, ds)
-              .mean(-1).mean(-2).repeat(ds, 0).repeat(ds, 1))
-        ax.imshow(ss[map(lambda a: slice(*a), boxes[neuronId])].T,
-                  cmap='hot', interpolation='nearest')
-        ax.axis('off')
-        plt.xlim(0, 6 * sig[0])
-        ax.text(1.2, .6, '%.3f' % (np.corrcoef(activityDS[ds][neuronId],
-                                               activityDS[1][neuronId])[0, 1]),
-                verticalalignment='center', transform=ax.transAxes)
-ax0.set_xticklabels([0, 5])
-ax0.set_xlabel('Time [min]', labelpad=-15)
-ax0.set_ylabel('Fluorescence [a.u.]', y=1.55)
-plt.savefig(figpath + '/traces_zebrafish.pdf') if figpath else plt.show(block=True)
+plt.ylim(.55, 1)
+plt.yticks(*[[.6, .8, 1.]] * 2)
+plt.ylabel('Correlation', labelpad=0)
+plt.legend(loc=(.01, .25), ncol=1)
+plt.subplots_adjust(.145, .15, .885, .97)
+ax2 = ax.twinx()
+ax2.set_zorder(-1)
+ax2.spines['top'].set_visible(False)
+z = np.mean((activityDS[1].T.dot(shapes.reshape(len(shapes), -1)) -
+             data.reshape(activity.shape[1], -1))**2)
+ax2.plot(dsls, [np.mean((activityDSlr[ds].T.dot(shapesDSlr[ds].repeat(ds, 1).repeat(ds, 2).reshape(
+    len(shapes), -1)) - data.reshape(activity.shape[1], -1))**2) / z for ds in dsls],
+    '+--', lw=3, c=cyan, mew=3, ms=10, clip_on=False, zorder=5)
+ax2.plot(dsls, [np.mean((activityDS[ds].T.dot(shapes.reshape(len(shapes), -1)) -
+                         data.reshape(activity.shape[1], -1))**2) / z for ds in dsls],
+         'x--', lw=3, c=orange, mew=3, ms=10, clip_on=False, zorder=5)
+plt.ylim(.999, 1.03)
+plt.xlim(dsls[0] - .2, dsls[-1] + .3)
+plt.yticks([1.00, 1.03], ['1.00', '1.03'])
+plt.ylabel('Normalized MSE', labelpad=-33)
+plt.savefig(figpath + '/Corr_zebrafish.pdf') if figpath else plt.show(block=True)
