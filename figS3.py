@@ -1,17 +1,21 @@
 import numpy as np
 from time import time
-from scipy.sparse import coo_matrix, csc_matrix
-from scipy.ndimage.filters import uniform_filter
+import matplotlib
+import matplotlib.pyplot as plt
 import tifffile
 import psutil
 from operator import itemgetter
-from skimage.transform import downscale_local_mean
-import ca_source_extraction as cse  # https://github.com/j-friedrich/CaImAn/tree/multi-scale_paper
-import pandas as pd
+from scipy.sparse import coo_matrix, csc_matrix
+from scipy.ndimage.filters import uniform_filter
 from scipy.stats import pearsonr
-import matplotlib
-import matplotlib.pyplot as plt
+from skimage.transform import downscale_local_mean
+import pandas as pd
+import requests
+import zipfile
+import StringIO
 from functions import init_fig, simpleaxis, showpause, IQRfill
+import ca_source_extraction as cse  # https://github.com/j-friedrich/CaImAn/tree/multi-scale_paper
+
 
 if matplotlib.__version__[0] == '2':
     matplotlib.style.use('classic')
@@ -87,7 +91,7 @@ for gcamp in ('6f', '6s'):
             Cf = HALS4activity(np.reshape(Y, (d1 * d2, T)), Ab, Cf)
             return Cf[:-1], Cf[-1].reshape(1, -1)
 
-        # ## load or generate shuffled data
+        # ## load or generate data using time series from Chen et al
         try:
             Yr = np.load('YrChen%s.npy' % gcamp, mmap_mode='r')
             C, S = itemgetter('C', 'S')(np.load('results/chen%s-truth.npz' % gcamp))
@@ -106,12 +110,16 @@ for gcamp in ('6f', '6s'):
                 dataset = 8
                 tau = 600
             b = True
-            spikes_train = pd.read_csv('../../spikefinder-python/spikefinder.train/' +
-                                       str(dataset) + '.train.spikes.csv')
-            calcium_train = pd.read_csv('../../spikefinder-python/spikefinder.train/' +
-                                        str(dataset) + '.train.calcium.csv')
+            # grab Chen et al data from spikefinder challenge
+            r = requests.get('https://s3.amazonaws.com/neuro.datasets/challenges/spikefinder/' +
+                             'spikefinder.train.zip', stream=True)
+            z = zipfile.ZipFile(StringIO.StringIO(r.content))
+            z.extractall()
+            spikes_train = pd.read_csv('spikefinder.train/%g.train.spikes.csv' % dataset)
+            calcium_train = pd.read_csv('spikefinder.train/%g.train.calcium.csv' % dataset)
             trueS = np.array(spikes_train).T
             Y = np.array(calcium_train).T
+            # determine kernel for each neuron
             k = []
             for n in range(len(trueS)):
                 s = trueS[n]
@@ -123,6 +131,7 @@ for gcamp in ('6f', '6s'):
                 ssm = ss - ss.mean() if b else ss
                 k.append(np.linalg.inv(ssm.dot(ssm.T)).dot(
                     ssm.dot(Y[n][:t]))[:(300 if gcamp == '6f' else 500)])
+            # resample to 20Hz, the rate our data was recorded
             if gcamp == '6f':
                 k = np.reshape(k, (-1, 60, 5)).mean(-1)
                 k -= k.min(1)[:, None]
