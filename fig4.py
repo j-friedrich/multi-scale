@@ -5,7 +5,7 @@ import tifffile
 from operator import itemgetter
 from skimage.filters import gaussian
 from functions import init_fig, gfp
-import ca_source_extraction as cse  # github.com/j-friedrich/Constrained_NMF/tree/multi-scale_paper
+import ca_source_extraction as cse  # https://github.com/j-friedrich/CaImAn/tree/multi-scale_paper
 
 if matplotlib.__version__[0] == '2':
     matplotlib.style.use('classic')

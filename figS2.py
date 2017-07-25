@@ -10,7 +10,7 @@ from scipy.ndimage.filters import uniform_filter
 from skimage.transform import downscale_local_mean
 from CNMF import LocalNMF, HALS4activity
 from functions import init_fig, simpleaxis, showpause, IQRfill
-import ca_source_extraction as cse  # github.com/j-friedrich/Constrained_NMF/tree/multi-scale_paper
+import ca_source_extraction as cse  # https://github.com/j-friedrich/CaImAn/tree/multi-scale_paper
 from scipy.stats import pearsonr
 
 

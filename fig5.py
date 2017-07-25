@@ -6,7 +6,7 @@ from skimage.filters import gaussian
 from scipy.ndimage.measurements import center_of_mass
 from scipy.optimize import minimize_scalar
 from functions import init_fig, simpleaxis
-import ca_source_extraction as cse  # github.com/j-friedrich/Constrained_NMF/tree/multi-scale_paper
+import ca_source_extraction as cse  # https://github.com/j-friedrich/CaImAn/tree/multi-scale_paper
 
 if matplotlib.__version__[0] == '2':
     matplotlib.style.use('classic')

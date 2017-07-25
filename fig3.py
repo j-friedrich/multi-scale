@@ -3,7 +3,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 from CNMF import LocalNMF, HALS4activity
 from functions import init_fig, simpleaxis, IQRfill
-import ca_source_extraction as cse  # github.com/j-friedrich/Constrained_NMF/tree/multi-scale_paper
+import ca_source_extraction as cse  # https://github.com/j-friedrich/CaImAn/tree/multi-scale_paper
 import itertools
 
 if matplotlib.__version__[0] == '2':

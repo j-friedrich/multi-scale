@@ -6,7 +6,7 @@ import tifffile
 import psutil
 from operator import itemgetter
 from skimage.transform import downscale_local_mean
-import ca_source_extraction as cse  # github.com/j-friedrich/Constrained_NMF/tree/multi-scale_paper
+import ca_source_extraction as cse  # https://github.com/j-friedrich/CaImAn/tree/multi-scale_paper
 import pandas as pd
 from scipy.stats import pearsonr
 import matplotlib

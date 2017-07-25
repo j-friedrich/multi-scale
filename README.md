@@ -1,6 +1,6 @@
 # Multi-scale approaches for high-speed imaging and analysis of large neural populations
 
-This code accompanies the paper [Multi-scale approaches for high-speed imaging and analysis of large neural populations](https://doi.org/10.1101/091132) [bioRxiv, 2016]
+This code accompanies the paper [Multi-scale approaches for high-speed imaging and analysis of large neural populations](https://doi.org/10.1101/091132) [PLoS Comput Biol. 2017; in press]
 
 
 ### Requirements
@@ -12,5 +12,5 @@ Please make sure to add the package Constrained_NMF to your $PYTHONPATH, so that
 
 
 ### Execution
-The scripts to produce the figures and table have names obvious from the bioRxiv paper. 
-They can be run with `python fig[1-8].py`. 
+The scripts to produce the figures and table have names obvious from the PLoS Comput Biol paper. 
+They can be run with `python table1.py` and `python fig[1-8].py` to show the figures during code execution. If a (sub)directory name is provided as argument, e.g. `python fig1.py fig`, figures are saved in the directory, e.g. `fig`, if it exists. For the two-photon data, fig[4-8], you need to execute `python run_2P.py` first, which could take few hours and saves the results in the subdirectory `results`.
